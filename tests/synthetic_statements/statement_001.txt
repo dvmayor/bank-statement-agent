@@ -1,0 +1,24 @@
+DBS BANK SINGAPORE
+Account Statement
+Account Number: XXXX-XXXX-1234
+Statement Period: 01 Apr 2026 to 30 Apr 2026
+
+Date        Description                          Debit       Credit      Balance
+01/04/2026  Opening Balance                                              5,200.50
+02/04/2026  SALARY CREDIT - ACME PTE LTD                     8,500.00   13,700.50
+03/04/2026  GRAB FOOD SG                          24.50                 13,676.00
+05/04/2026  NTUC FAIRPRICE                       128.40                 13,547.60
+07/04/2026  SP GROUP UTILITIES                   145.20                 13,402.40
+08/04/2026  NETFLIX SUBSCRIPTION                  19.98                 13,382.42
+10/04/2026  GRAB TRANSPORT                        12.30                 13,370.12
+12/04/2026  SHOPEE ORDER                         245.00                 13,125.12
+14/04/2026  ATM CASH WITHDRAWAL                  500.00                 12,625.12
+15/04/2026  SINGTEL MOBILE                        62.00                 12,563.12
+17/04/2026  GRAB FOOD SG                          24.50                 12,538.62
+18/04/2026  PAYNOW TRANSFER - J. TAN             300.00                 12,238.62
+20/04/2026  AMAZON SG                            187.40                 12,051.22
+22/04/2026  WATSONS PHARMACY                      34.80                 12,016.42
+25/04/2026  UNUSUAL MERCHANT XYZ              5,200.00                  6,816.42
+27/04/2026  SPOTIFY PREMIUM                       10.98                  6,805.44
+28/04/2026  KOPITIAM LUNCH                         8.50                  6,796.94
+30/04/2026  Closing Balance                                              6,796.94

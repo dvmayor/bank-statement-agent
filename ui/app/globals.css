@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #0a192f;
+  color: #8892b0;
+  font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: #64ffda;
+  color: #0a192f;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a192f;
+}
+::-webkit-scrollbar-thumb {
+  background: #233554;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2d4170;
+}
+
+/* Section eyebrow — icon + small-caps mono label */
+.section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ccd6f6;
+}
+.section-eyebrow svg {
+  color: #64ffda;
+}
+
+/* Section title — big bold with period */
+.section-title {
+  color: #ccd6f6;
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 0.5rem;
+}
+
+/* Mono accent label */
+.mono-accent {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  color: #64ffda;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+}
+
+/* Solid teal button — matches portfolio "Send Message" */
+.btn-solid {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #64ffda;
+  color: #0a192f;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+}
+.btn-solid:hover:not(:disabled) {
+  background: #5ee9c6;
+  transform: translateY(-1px);
+}
+.btn-solid:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ghost button — bordered teal, fills on hover */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: transparent;
+  border: 1px solid #64ffda;
+  color: #64ffda;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: #64ffda19;
+}
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Form field — match contact-me style */
+.field {
+  width: 100%;
+  background: #112240;
+  border: 1px solid #233554;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: #ccd6f6;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease;
+}
+.field:hover {
+  border-color: #2d4170;
+}
+.field:focus {
+  outline: none;
+  border-color: #64ffda;
+}

@@ -1,0 +1,104 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'darkMode': true,
+    'background': '#0a192f',
+    'primaryColor': '#112240',
+    'primaryTextColor': '#ccd6f6',
+    'primaryBorderColor': '#64ffda',
+    'lineColor': '#64ffda',
+    'textColor': '#ccd6f6',
+    'fontFamily': 'Inter, system-ui, sans-serif',
+    'actorBkg': '#112240',
+    'actorBorder': '#64ffda',
+    'actorTextColor': '#ccd6f6',
+    'actorLineColor': '#233554',
+    'signalColor': '#ccd6f6',
+    'signalTextColor': '#ccd6f6',
+    'labelBoxBkgColor': '#0a192f',
+    'labelBoxBorderColor': '#64ffda',
+    'labelTextColor': '#64ffda',
+    'loopTextColor': '#ccd6f6',
+    'noteBkgColor': '#0f1d36',
+    'noteTextColor': '#a8b2d1',
+    'noteBorderColor': '#233554',
+    'activationBkgColor': '#1a2a4a',
+    'activationBorderColor': '#64ffda',
+    'sequenceNumberColor': '#0a192f'
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as Next.js UI
+    participant API as FastAPI
+    participant PDF as PDF Parser
+    participant Orch as ReAct Orchestrator<br/>(api/agent.py)
+    participant LLM as api/llm.py
+    participant Tools as Tools<br/>(extract/categorise/<br/>anomalies/summary)
+    participant Store as CategoryStore
+
+    User->>UI: Drop PDF + select provider + mode
+    UI->>API: POST /analyze (file, provider, mode)
+    API->>PDF: extract_text(pdf_bytes)
+    PDF-->>API: raw_text
+    API->>Orch: run_agent(raw_text, provider, mode)
+
+    Note over Orch: state = {transactions:[],<br/>anomalies:[], summary:{},<br/>raw_text}<br/>history = []
+
+    rect rgb(12, 42, 74)
+    Note over Orch,LLM: Iteration 1 — extract
+    Orch->>LLM: complete(prompt + history, provider)
+    LLM-->>Orch: {"action":"call_tool",<br/>"tool":"extract_transactions"}
+    Orch->>Tools: extract_transactions(raw_text)
+    Tools->>LLM: complete(extraction prompt)
+    LLM-->>Tools: JSON rows
+    Tools-->>Orch: 16 transactions
+    Note over Orch: history += OBSERVATION:<br/>"OK. Extracted 16 transactions."
+    end
+
+    rect rgb(15, 53, 40)
+    Note over Orch,Store: Iteration 2 — categorise
+    Orch->>LLM: complete(prompt + history)
+    LLM-->>Orch: {"action":"call_tool",<br/>"tool":"categorise_transactions"}
+    Orch->>Tools: categorise_transactions(state.transactions)
+    Tools->>Store: find_similar(description) per tx
+    Store-->>Tools: top-3 candidate categories
+    Tools->>LLM: complete(categorisation prompt)
+    LLM-->>Tools: category + reasoning
+    Tools-->>Orch: enriched transactions
+    Note over Orch: history += OBSERVATION:<br/>"OK. Categorised 16 transactions."
+    end
+
+    rect rgb(58, 31, 14)
+    Note over Orch,LLM: Iteration 3 — detect anomalies
+    Orch->>LLM: complete(prompt + history)
+    LLM-->>Orch: {"action":"call_tool",<br/>"tool":"detect_anomalies"}
+    Orch->>Tools: detect_anomalies(state.transactions)
+    Tools->>Tools: rule-based checks<br/>(duplicates, large debits)
+    Tools->>LLM: complete(LLM anomaly prompt)
+    LLM-->>Tools: contextual flags
+    Tools-->>Orch: anomalies list
+    Note over Orch: history += OBSERVATION:<br/>"OK. Detected 2 anomalies."
+    end
+
+    rect rgb(42, 26, 74)
+    Note over Orch,LLM: Iteration 4 — summary
+    Orch->>LLM: complete(prompt + history)
+    LLM-->>Orch: {"action":"call_tool",<br/>"tool":"generate_summary"}
+    Orch->>Tools: generate_summary(state)
+    Tools->>LLM: complete(narrative prompt)
+    LLM-->>Tools: narrative text
+    Tools-->>Orch: summary object
+    Note over Orch: history += OBSERVATION:<br/>"OK. Net cashflow: 6796.94"
+    end
+
+    rect rgb(58, 14, 14)
+    Note over Orch,LLM: Iteration 5 — finish
+    Orch->>LLM: complete(prompt + history)
+    LLM-->>Orch: {"action":"finish",<br/>"thought":"all tools done"}
+    end
+
+    Orch-->>API: {transactions, anomalies, summary}
+    API-->>UI: JSON + metadata{provider, model, mode, elapsed}
+    UI-->>User: Render table + chart + summary

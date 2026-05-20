@@ -1,0 +1,83 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'darkMode': true,
+    'background': '#0a192f',
+    'primaryColor': '#112240',
+    'primaryTextColor': '#ccd6f6',
+    'primaryBorderColor': '#64ffda',
+    'lineColor': '#64ffda',
+    'textColor': '#ccd6f6',
+    'fontFamily': 'Inter, system-ui, sans-serif',
+    'actorBkg': '#112240',
+    'actorBorder': '#64ffda',
+    'actorTextColor': '#ccd6f6',
+    'actorLineColor': '#233554',
+    'signalColor': '#ccd6f6',
+    'signalTextColor': '#ccd6f6',
+    'labelBoxBkgColor': '#0a192f',
+    'labelBoxBorderColor': '#64ffda',
+    'labelTextColor': '#64ffda',
+    'loopTextColor': '#ccd6f6',
+    'noteBkgColor': '#0f1d36',
+    'noteTextColor': '#a8b2d1',
+    'noteBorderColor': '#233554',
+    'activationBkgColor': '#1a2a4a',
+    'activationBorderColor': '#64ffda',
+    'sequenceNumberColor': '#0a192f'
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as Next.js UI
+    participant PS as ProviderSelect
+    participant MS as ModeSelect
+    participant API as FastAPI
+    participant Agent as Agent Orchestrator
+
+    User->>UI: Open page
+    UI->>API: GET /providers
+    API-->>UI: {providers:[gemini,claude,groq],<br/>modes:[react,native],<br/>default_provider:"gemini",<br/>default_mode:"react"}
+    UI->>PS: render dropdown<br/>(default: gemini)
+    UI->>MS: render dropdown<br/>(default: react)
+
+    rect rgb(15, 53, 40)
+    Note over User,MS: Scenario A — default Gemini + ReAct
+    User->>UI: drop PDF (no dropdown change)
+    UI->>API: POST /analyze<br/>file + provider=gemini + mode=react
+    API->>Agent: run_agent(text, "gemini", "react")
+    Note over Agent: dispatches to _run_react_loop
+    Agent-->>API: result
+    API-->>UI: JSON + metadata{<br/>model:"gemini-2.5-flash",<br/>mode:"react"}
+    end
+
+    rect rgb(42, 26, 74)
+    Note over User,Agent: Scenario B — switch to Claude + Native
+    User->>PS: select "Claude"
+    PS->>UI: setProvider("claude")
+    Note over MS: "native" option<br/>now enabled
+    User->>MS: select "Native tool-use"
+    MS->>UI: setMode("native")
+    User->>UI: drop PDF
+    UI->>API: POST /analyze<br/>file + provider=claude + mode=native
+    API->>Agent: run_agent(text, "claude", "native")
+    Note over Agent: dispatches to<br/>_run_claude_native_agent
+    Agent-->>API: result
+    API-->>UI: JSON + metadata{<br/>model:"claude-sonnet-4-6",<br/>mode:"native"}
+    end
+
+    rect rgb(58, 31, 14)
+    Note over User,Agent: Scenario C — switch provider, mode auto-resets
+    User->>PS: select "Groq"<br/>(while mode=native)
+    PS->>UI: setProvider("groq")
+    UI->>MS: handleProviderChange detects<br/>non-Claude + native → resets mode
+    MS->>UI: setMode("react")
+    Note over MS: "native" option<br/>now disabled
+    User->>UI: drop PDF
+    UI->>API: POST /analyze<br/>file + provider=groq + mode=react
+    API->>Agent: run_agent(text, "groq", "react")
+    Note over Agent: dispatches to _run_react_loop<br/>(same code path as Scenario A)
+    Agent-->>API: result
+    API-->>UI: JSON + metadata{<br/>model:"llama-3.3-70b-versatile",<br/>mode:"react"}
+    end

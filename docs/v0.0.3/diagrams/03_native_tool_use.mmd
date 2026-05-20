@@ -1,0 +1,93 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'darkMode': true,
+    'background': '#0a192f',
+    'primaryColor': '#112240',
+    'primaryTextColor': '#ccd6f6',
+    'primaryBorderColor': '#64ffda',
+    'lineColor': '#64ffda',
+    'textColor': '#ccd6f6',
+    'fontFamily': 'Inter, system-ui, sans-serif',
+    'actorBkg': '#112240',
+    'actorBorder': '#a78bfa',
+    'actorTextColor': '#ccd6f6',
+    'actorLineColor': '#233554',
+    'signalColor': '#ccd6f6',
+    'signalTextColor': '#ccd6f6',
+    'labelBoxBkgColor': '#0a192f',
+    'labelBoxBorderColor': '#a78bfa',
+    'labelTextColor': '#a78bfa',
+    'loopTextColor': '#ccd6f6',
+    'noteBkgColor': '#0f1d36',
+    'noteTextColor': '#a8b2d1',
+    'noteBorderColor': '#233554',
+    'activationBkgColor': '#2a1a4a',
+    'activationBorderColor': '#a78bfa',
+    'sequenceNumberColor': '#0a192f'
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    participant API as FastAPI
+    participant Orch as Claude Native Orch<br/>(_run_claude_native_agent)
+    participant SDK as anthropic SDK
+    participant Server as Anthropic API<br/>(servers)
+    participant Tools as Tool Handlers
+
+    API->>Orch: run_agent(raw_text, "claude", "native")
+    Note over Orch: messages = [user msg]<br/>tools = [4 schemas]
+
+    rect rgb(42, 26, 74)
+    Note over Orch,Server: Turn 1 — Anthropic returns first tool_use
+    Orch->>SDK: messages.create(<br/>  tools=[schemas],<br/>  messages=messages)
+    SDK->>Server: HTTPS POST<br/>{tools, messages}
+    Note over Server: model generates output<br/>servers parse against schema<br/>validate input fields
+    Server-->>SDK: {content:[{type:"tool_use",<br/>  name:"extract_transactions",<br/>  input:{raw_text:...}}],<br/>stop_reason:"tool_use"}
+    SDK-->>Orch: ToolUseBlock<br/>(typed Python object)
+    Orch->>Tools: extract_transactions(**block.input)
+    Tools-->>Orch: 16 transactions
+    Note over Orch: messages += assistant msg<br/>messages += tool_result
+    end
+
+    rect rgb(15, 53, 40)
+    Note over Orch,Server: Turn 2 — categorise
+    Orch->>SDK: messages.create(tools, messages)
+    SDK->>Server: HTTPS POST (tools schema re-sent)
+    Server-->>SDK: ToolUseBlock(categorise_transactions)
+    SDK-->>Orch: typed object
+    Orch->>Tools: categorise_transactions(...)
+    Tools-->>Orch: enriched transactions
+    Note over Orch: append tool_result
+    end
+
+    rect rgb(58, 31, 14)
+    Note over Orch,Server: Turn 3 — anomalies
+    Orch->>SDK: messages.create(tools, messages)
+    SDK->>Server: HTTPS POST
+    Server-->>SDK: ToolUseBlock(detect_anomalies)
+    SDK-->>Orch: typed object
+    Orch->>Tools: detect_anomalies(...)
+    Tools-->>Orch: anomalies
+    end
+
+    rect rgb(12, 42, 74)
+    Note over Orch,Server: Turn 4 — summary
+    Orch->>SDK: messages.create(tools, messages)
+    SDK->>Server: HTTPS POST
+    Server-->>SDK: ToolUseBlock(generate_summary)
+    SDK-->>Orch: typed object
+    Orch->>Tools: generate_summary(...)
+    Tools-->>Orch: summary
+    end
+
+    rect rgb(58, 14, 14)
+    Note over Orch,Server: Turn 5 — finish
+    Orch->>SDK: messages.create(tools, messages)
+    SDK->>Server: HTTPS POST
+    Server-->>SDK: {content:[{type:"text",<br/>text:"final JSON"}],<br/>stop_reason:"end_turn"}
+    SDK-->>Orch: TextBlock
+    Orch->>Orch: json.loads(text) → final result
+    end
+
+    Orch-->>API: {transactions, anomalies, summary}

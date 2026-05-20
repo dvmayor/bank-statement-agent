@@ -1,0 +1,64 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'darkMode': true,
+    'background': '#0a192f',
+    'primaryColor': '#112240',
+    'primaryTextColor': '#ccd6f6',
+    'primaryBorderColor': '#64ffda',
+    'lineColor': '#64ffda',
+    'textColor': '#ccd6f6',
+    'fontFamily': 'Inter, system-ui, sans-serif',
+    'actorBkg': '#112240',
+    'actorBorder': '#64ffda',
+    'actorTextColor': '#ccd6f6',
+    'actorLineColor': '#233554',
+    'signalColor': '#ccd6f6',
+    'signalTextColor': '#ccd6f6',
+    'labelBoxBkgColor': '#0a192f',
+    'labelBoxBorderColor': '#64ffda',
+    'labelTextColor': '#64ffda',
+    'loopTextColor': '#ccd6f6',
+    'noteBkgColor': '#0f1d36',
+    'noteTextColor': '#a8b2d1',
+    'noteBorderColor': '#233554',
+    'activationBkgColor': '#1a2a4a',
+    'activationBorderColor': '#64ffda',
+    'sequenceNumberColor': '#0a192f'
+  }
+}}%%
+sequenceDiagram
+    autonumber
+    participant YC as Your Code
+    participant SDK as Anthropic SDK
+    participant Server as Anthropic Servers
+    participant LLM as LLM (model)
+
+    rect rgb(42, 26, 74)
+    Note over YC,LLM: NATIVE MODE — Anthropic does the parsing
+    YC->>SDK: messages.create(<br/>  tools=[extract_schema],<br/>  messages=[...])
+    SDK->>Server: HTTPS POST<br/>{tools, messages}
+    Server->>LLM: prompt + tool schemas
+    LLM-->>Server: raw text:<br/>"I'll call extract_transactions<br/>with raw_text=..."
+    Note over Server: parses raw output<br/>validates against schema<br/>builds structured response
+    Server-->>SDK: {content:[{<br/>  type:"tool_use",<br/>  name:"extract_transactions",<br/>  input:{raw_text:"..."}}],<br/>stop_reason:"tool_use"}
+    SDK-->>YC: ToolUseBlock object<br/>(already typed)
+    Note over YC: block.name = "extract_transactions"<br/>block.input = {raw_text:"..."}<br/>NO PARSING NEEDED
+    YC->>YC: handler(**block.input)
+    end
+
+    rect rgb(15, 53, 40)
+    Note over YC,LLM: REACT MODE — your code does the parsing
+    YC->>SDK: messages.create(<br/>  messages=[...]<br/>  NO tools= PARAM)
+    SDK->>Server: HTTPS POST<br/>{messages only}
+    Server->>LLM: prompt (with JSON format<br/>instructions in system)
+    LLM-->>Server: raw text:<br/>'{"action":"call_tool",<br/>"tool":"extract_transactions",<br/>"thought":"start parsing"}'
+    Note over Server: NO parsing<br/>NO validation<br/>just text passthrough
+    Server-->>SDK: {content:[{<br/>  type:"text",<br/>  text:"{\"action\":...}"}],<br/>stop_reason:"end_turn"}
+    SDK-->>YC: TextBlock<br/>(just a string field)
+    Note over YC: raw = block.text<br/>action = json.loads(raw)<br/>YOU PARSE IT
+    YC->>YC: validate action shape
+    YC->>YC: tool = action["tool"]<br/>handler = TOOL_HANDLERS[tool]<br/>handler(state, provider)
+    end
+
+    Note over YC,LLM: Both produce the same tool execution.<br/>Difference: where the JSON-from-text parsing happens.

@@ -1,0 +1,78 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'darkMode': true,
+    'background': '#0a192f',
+    'primaryColor': '#112240',
+    'primaryTextColor': '#ccd6f6',
+    'primaryBorderColor': '#64ffda',
+    'lineColor': '#64ffda',
+    'edgeLabelBackground': '#0a192f',
+    'secondaryColor': '#1e293b',
+    'tertiaryColor': '#0a192f',
+    'textColor': '#ccd6f6',
+    'mainBkg': '#112240',
+    'clusterBkg': '#0f1d36',
+    'clusterBorder': '#233554',
+    'fontFamily': 'Inter, system-ui, sans-serif'
+  }
+}}%%
+flowchart TD
+    subgraph BROWSER["Browser (Next.js UI)"]
+        UI_DROP["PDF drag-drop"]
+        UI_PROV["Provider dropdown<br/>(Gemini default)"]
+        UI_MODE["Mode dropdown<br/>(ReAct default)"]
+        UI_RES["Results table<br/>+ Spend chart<br/>+ Summary"]
+    end
+
+    BROWSER -->|"POST /analyze<br/>file + provider + mode"| API
+
+    subgraph API["FastAPI Backend (Python 3.12)"]
+        PDF["PDF Parser<br/>pdfplumber → PyMuPDF fallback"]
+        AGENT{"Agent Orchestrator<br/>api/agent.py"}
+
+        subgraph REACT_BLOCK["mode = react (default)"]
+            REACT["Provider-agnostic<br/>ReAct loop"]
+        end
+
+        subgraph NATIVE_BLOCK["mode = native (Claude only)"]
+            NATIVE["Anthropic tool_use<br/>loop"]
+        end
+
+        LLM["api/llm.py<br/>unified complete()<br/>━━━━━━━━━━━━━━<br/>google-genai (Gemini)<br/>anthropic (Claude)<br/>groq (Llama 3.3)"]
+
+        subgraph TOOLS["api/tools/"]
+            T1["extract_transactions"]
+            T2["categorise_transactions"]
+            T3["detect_anomalies"]
+            T4["generate_summary"]
+        end
+
+        STORE["InMemory CategoryStore<br/>━━━━━━━━━━━━━━<br/>numpy cosine similarity<br/>sentence-transformers<br/>all-MiniLM-L6-v2"]
+    end
+
+    PDF --> AGENT
+    AGENT --> REACT_BLOCK
+    AGENT --> NATIVE_BLOCK
+    REACT --> LLM
+    NATIVE --> LLM
+    REACT --> TOOLS
+    NATIVE --> TOOLS
+    T2 -.->|"RAG lookup"| STORE
+
+    API -->|"JSON<br/>{transactions, anomalies,<br/>summary, metadata}"| BROWSER
+
+    classDef default fill:#112240,stroke:#233554,color:#ccd6f6,stroke-width:1px
+    classDef agent fill:#0a192f,stroke:#64ffda,color:#64ffda,stroke-width:2px
+    classDef react fill:#0c2a4a,stroke:#64ffda,color:#ccd6f6,stroke-width:1px
+    classDef native fill:#2a1a4a,stroke:#a78bfa,color:#ccd6f6,stroke-width:1px
+    classDef llm fill:#0f3528,stroke:#5eead4,color:#ccd6f6,stroke-width:1px
+    classDef tools fill:#3a1f0e,stroke:#fb923c,color:#ccd6f6,stroke-width:1px
+    classDef store fill:#3a2e0e,stroke:#facc15,color:#ccd6f6,stroke-width:1px
+
+    class AGENT agent
+    class REACT react
+    class NATIVE native
+    class LLM llm
+    class T1,T2,T3,T4 tools
+    class STORE store

@@ -1,0 +1,24 @@
+{
+  "transactions": [
+    {"date": "2026-04-02", "description": "SALARY CREDIT - ACME PTE LTD", "credit": 8500.00, "category": "Salary"},
+    {"date": "2026-04-03", "description": "GRAB FOOD SG", "debit": 24.50, "category": "Food"},
+    {"date": "2026-04-05", "description": "NTUC FAIRPRICE", "debit": 128.40, "category": "Food"},
+    {"date": "2026-04-07", "description": "SP GROUP UTILITIES", "debit": 145.20, "category": "Bills"},
+    {"date": "2026-04-08", "description": "NETFLIX SUBSCRIPTION", "debit": 19.98, "category": "Entertainment"},
+    {"date": "2026-04-10", "description": "GRAB TRANSPORT", "debit": 12.30, "category": "Transport"},
+    {"date": "2026-04-12", "description": "SHOPEE ORDER", "debit": 245.00, "category": "Shopping"},
+    {"date": "2026-04-14", "description": "ATM CASH WITHDRAWAL", "debit": 500.00, "category": "ATM"},
+    {"date": "2026-04-15", "description": "SINGTEL MOBILE", "debit": 62.00, "category": "Bills"},
+    {"date": "2026-04-17", "description": "GRAB FOOD SG", "debit": 24.50, "category": "Food"},
+    {"date": "2026-04-18", "description": "PAYNOW TRANSFER - J. TAN", "debit": 300.00, "category": "Transfer"},
+    {"date": "2026-04-20", "description": "AMAZON SG", "debit": 187.40, "category": "Shopping"},
+    {"date": "2026-04-22", "description": "WATSONS PHARMACY", "debit": 34.80, "category": "Healthcare"},
+    {"date": "2026-04-25", "description": "UNUSUAL MERCHANT XYZ", "debit": 5200.00, "category": "Other"},
+    {"date": "2026-04-27", "description": "SPOTIFY PREMIUM", "debit": 10.98, "category": "Entertainment"},
+    {"date": "2026-04-28", "description": "KOPITIAM LUNCH", "debit": 8.50, "category": "Food"}
+  ],
+  "expected_anomalies": [
+    {"description": "GRAB FOOD SG", "type": "duplicate"},
+    {"description": "UNUSUAL MERCHANT XYZ", "type": "large_debit"}
+  ]
+}
