@@ -14,7 +14,7 @@ export default function ModeSelect({
   provider: Provider;
   disabled?: boolean;
 }) {
-  const nativeAvailable = provider === "claude";
+  const nativeAvailable = (provider as string) === "claude";
   return (
     <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
       <label className="text-xxs font-mono uppercase tracking-wider text-slate">agent mode</label>
