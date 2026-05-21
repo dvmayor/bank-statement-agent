@@ -6,6 +6,7 @@ google-genai==0.3.0
 groq==0.11.0
 pdfplumber==0.11.4
 PyMuPDF==1.24.10
+torch==2.4.0+cpu --index-url https://download.pytorch.org/whl/cpu
 sentence-transformers==3.1.1
 numpy>=1.26,<3
 pydantic==2.9.2
