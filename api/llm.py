@@ -59,22 +59,25 @@ def _log_llm_call(
     except Exception as e:
         log.warning("llm_log_write_failed", error=str(e))
 
-Provider = Literal["gemini", "claude", "groq"]
-
-DEFAULT_PROVIDER: Provider = "gemini"
+Provider = Literal["gemini", "gemini2", "groq", "groq2", "cerebras"]
 
 PROVIDER_MODELS = {
-    # gemini-2.0-flash: 15 RPM on free tier (vs 5 RPM for 2.5-flash preview)
-    "gemini": "gemini-2.0-flash",
-    "claude": "claude-sonnet-4-6",
-    "groq": "llama-3.3-70b-versatile",
+    "gemini":   "gemma-4-26b-a4b-it",
+    "gemini2":  "gemma-4-31b-it",
+    "groq":     "llama-3.3-70b-versatile",
+    "groq2":    "llama-3.1-8b-instant",
+    "cerebras": "qwen-3-235b-a22b-instruct-2507",
 }
 
 PROVIDER_LABELS = {
-    "gemini": "Google Gemini 2.0 Flash (free tier)",
-    "claude": "Anthropic Claude Sonnet 4.6 (paid)",
-    "groq": "Groq Llama 3.3 70B (free tier)",
+    "groq":     "Groq (Llama 3.3 70B) - fast (recommended)",
+    "groq2":    "Groq (Llama 3.1 8B) - very fast but can be inaccurate",
+    "cerebras": "Cerebras (Qwen 3 235B) - moderate",
+    "gemini":   "Google (Gemma 4 26B) - slow",
+    "gemini2":  "Google (Gemma 4 31B) - slow",
 }
+
+DEFAULT_PROVIDER: Provider = "groq"
 
 # Retry tunables
 MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -97,6 +100,7 @@ _RATE_LIMIT_MARKERS = (
 
 # Other transient errors worth retrying (service unavailable, network blip).
 _TRANSIENT_MARKERS = (
+    "500", "INTERNAL",
     "503", "UNAVAILABLE",
     "timeout", "Timeout", "overloaded", "Overloaded",
     "connection", "Connection", "ECONNRESET", "ETIMEDOUT",
@@ -126,29 +130,43 @@ def _suggested_retry_delay(err: Exception) -> float:
     return float(m.group(1)) if m else 0.0
 
 
-def _call_provider(prompt: str, system: str, max_tokens: int, provider: Provider) -> str:
+_PROVIDER_KEYS_ENV = {
+    "gemini":   ("GOOGLE_API_KEYS",     "GOOGLE_API_KEY"),
+    "gemini2":  ("GOOGLE_API_KEYS",     "GOOGLE_API_KEY"),
+    "groq":     ("GROQ_API_KEYS",       "GROQ_API_KEY"),
+    "groq2":    ("GROQ_API_KEYS",       "GROQ_API_KEY"),
+    "cerebras": ("CEREBRAS_API_KEYS",   "CEREBRAS_API_KEY"),
+}
+
+
+def _get_keys(provider: Provider) -> list[str]:
+    """Return all configured API keys for a provider.
+
+    Checks <PROVIDER>_API_KEYS (comma-separated) first, then <PROVIDER>_API_KEY.
+    Also handles comma-separated values in the singular var for convenience.
+    """
+    env_multi, env_single = _PROVIDER_KEYS_ENV[provider]
+    multi = os.environ.get(env_multi, "")
+    if multi:
+        return [k.strip() for k in multi.split(",") if k.strip()]
+    single = os.environ.get(env_single, "")
+    if "," in single:
+        return [k.strip() for k in single.split(",") if k.strip()]
+    return [single] if single else []
+
+
+def _call_provider(prompt: str, system: str, max_tokens: int, provider: Provider,
+                   api_key: str | None = None) -> str:
     """Single attempt against the chosen provider. Caller handles retries."""
     # Re-read .env on every call so key changes take effect without restarting uvicorn.
     from dotenv import load_dotenv
     load_dotenv(override=True)
 
-    if provider == "claude":
-        from anthropic import Anthropic
-        client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-        kwargs = {
-            "model": PROVIDER_MODELS["claude"],
-            "max_tokens": max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        if system:
-            kwargs["system"] = system
-        msg = client.messages.create(**kwargs)
-        return msg.content[0].text
-
-    if provider == "gemini":
+    if provider in ("gemini", "gemini2"):
         from google import genai
         from google.genai import types
-        client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        key = api_key or os.environ["GOOGLE_API_KEY"]
+        client = genai.Client(api_key=key)
         config = types.GenerateContentConfig(
             max_output_tokens=max_tokens,
             system_instruction=system or None,
@@ -160,15 +178,31 @@ def _call_provider(prompt: str, system: str, max_tokens: int, provider: Provider
         )
         return resp.text or ""
 
-    if provider == "groq":
+    if provider in ("groq", "groq2"):
         from groq import Groq
-        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        key = api_key or os.environ["GROQ_API_KEY"]
+        client = Groq(api_key=key)
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         resp = client.chat.completions.create(
             model=PROVIDER_MODELS["groq"],
+            messages=messages,
+            max_tokens=max_tokens,
+        )
+        return resp.choices[0].message.content or ""
+
+    if provider == "cerebras":
+        from cerebras.cloud.sdk import Cerebras
+        key = api_key or os.environ["CEREBRAS_API_KEY"]
+        client = Cerebras(api_key=key)
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        resp = client.chat.completions.create(
+            model=PROVIDER_MODELS["cerebras"],
             messages=messages,
             max_tokens=max_tokens,
         )
@@ -192,10 +226,15 @@ def complete(
     log.info("llm_call", provider=provider, prompt_chars=len(prompt))
     last_err: Exception | None = None
 
+    # Build key list once; cycle on 429 before giving up.
+    keys = _get_keys(provider)
+    key_idx = 0
+
     for attempt in range(MAX_RETRIES + 1):
+        api_key = keys[key_idx] if keys else None
         try:
             t0 = time.time()
-            response = _call_provider(prompt, system, max_tokens, provider)
+            response = _call_provider(prompt, system, max_tokens, provider, api_key=api_key)
             _log_llm_call(
                 provider=provider,
                 model=PROVIDER_MODELS[provider],
@@ -209,7 +248,16 @@ def complete(
         except Exception as e:
             last_err = e
             if _is_rate_limit(e):
-                # 429 / quota exhausted — don't retry, surface immediately
+                if key_idx < len(keys) - 1:
+                    key_idx += 1
+                    log.warning(
+                        "api_key_rate_limited_cycling",
+                        provider=provider,
+                        key_index=key_idx - 1,
+                        next_key_index=key_idx,
+                        keys_remaining=len(keys) - key_idx,
+                    )
+                    continue
                 log.error("llm_rate_limited", provider=provider, error=str(e)[:200])
                 raise
             if attempt >= MAX_RETRIES or not _is_transient(e):

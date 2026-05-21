@@ -146,11 +146,6 @@ def providers() -> dict:
                 "label": "ReAct loop (any provider)",
                 "description": "Provider-agnostic agent loop. Thinks, calls a tool, observes, repeats.",
             },
-            {
-                "id": "native",
-                "label": "Native tool-use (Claude only)",
-                "description": "Uses Anthropic's tool_use API directly. Falls back to ReAct for other providers.",
-            },
         ],
     }
 
@@ -158,7 +153,7 @@ def providers() -> dict:
 @app.post("/analyze")
 async def analyze(
     file: UploadFile = File(...),
-    provider: Literal["gemini", "claude", "groq"] = Form(DEFAULT_PROVIDER),
+    provider: Literal["gemini", "gemini2", "groq", "groq2", "cerebras", "claude"] = Form(DEFAULT_PROVIDER),
     mode: Literal["react", "native"] = Form(DEFAULT_MODE),
 ) -> dict:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -197,7 +192,7 @@ async def analyze(
 @app.post("/analyze/stream")
 async def analyze_stream(
     file: UploadFile = File(...),
-    provider: Literal["gemini", "claude", "groq"] = Form(DEFAULT_PROVIDER),
+    provider: Literal["gemini", "gemini2", "groq", "groq2", "cerebras", "claude"] = Form(DEFAULT_PROVIDER),
     mode: Literal["react", "native"] = Form(DEFAULT_MODE),
 ):
     """SSE-streaming variant of /analyze. Emits one event per agent step,

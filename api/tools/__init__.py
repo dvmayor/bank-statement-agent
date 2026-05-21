@@ -2,6 +2,7 @@ from .extract import extract_transactions
 from .categorise import categorise_transactions
 from .anomalies import detect_anomalies
 from .summary import generate_summary
+from .validate import validate_extraction
 
 # Tool schemas remain only for the Claude tool-use loop (see agent.py).
 EXTRACT_TOOL_SCHEMA = {

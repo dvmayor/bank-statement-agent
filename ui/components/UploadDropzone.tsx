@@ -25,7 +25,7 @@ export default function UploadDropzone({
       onClick={() => inputRef.current?.click()}
       className={`
         border border-dashed rounded-[10px] p-8 text-center cursor-pointer transition-all
-        ${drag ? "border-accent bg-accent/5" : "border-navy-lighter hover:border-accent/50 hover:bg-navy-light/30"}
+        ${drag ? "border-accent bg-accent/5" : "border-navy-lighter bg-navy-light/60 hover:border-accent/50 hover:bg-navy-light/90"}
         ${loading ? "pointer-events-none" : ""}
       `}
     >

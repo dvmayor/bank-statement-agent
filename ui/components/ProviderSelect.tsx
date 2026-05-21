@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export type Provider = "gemini" | "claude" | "groq";
+export type Provider = "gemini" | "gemini2" | "groq" | "groq2" | "cerebras";
 
 export type ProviderOption = {
   id: Provider;
@@ -10,9 +10,16 @@ export type ProviderOption = {
 };
 
 const FALLBACK: ProviderOption[] = [
-  { id: "gemini", label: "Google Gemini 2.0 Flash (free tier)", model: "gemini-2.0-flash" },
-  { id: "claude", label: "Anthropic Claude Sonnet 4.6 (paid)", model: "claude-sonnet-4-6" },
-  { id: "groq", label: "Groq Llama 3.3 70B (free tier)", model: "llama-3.3-70b-versatile" },
+  { id: "groq",     label: "Groq (Llama 3.3 70B) — fast (recommended)",       model: "llama-3.3-70b-versatile" },
+  { id: "groq2",    label: "Groq (Llama 3.1 8B) — very fast but can be inaccurate",  model: "llama-3.1-8b-instant" },
+  { id: "cerebras", label: "Cerebras (Qwen 3 235B) — moderate",                 model: "qwen-3-235b-a22b-instruct-2507" },
+  { id: "gemini",   label: "Google (Gemma 4 26B) — slow",                      model: "gemma-4-26b-a4b-it" },
+  { id: "gemini2",  label: "Google (Gemma 4 31B) — very slow",                  model: "gemma-4-31b-it" },
+];
+
+const DISABLED_OPTIONS = [
+  { id: "anthropic", label: "Anthropic (Claude Sonnet) — unavailable" },
+  { id: "openai",    label: "OpenAI (GPT-4o) — unavailable" },
 ];
 
 export default function ProviderSelect({
@@ -42,10 +49,11 @@ export default function ProviderSelect({
         disabled={disabled}
         className="field disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {options.map((opt) => (
-          <option key={opt.id} value={opt.id} className="bg-navy-light">
-            {opt.label}
-          </option>
+        {options.map(opt => (
+          <option key={opt.id} value={opt.id} className="bg-navy-light">{opt.label}</option>
+        ))}
+        {DISABLED_OPTIONS.map(opt => (
+          <option key={opt.id} value={opt.id} disabled className="bg-navy-light opacity-40">{opt.label}</option>
         ))}
       </select>
     </div>

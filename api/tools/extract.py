@@ -51,6 +51,29 @@ def _fix_date(tx: dict) -> dict:
     return tx
 
 
+# Patterns in descriptions that always indicate an incoming credit (money arriving).
+# If the extractor sets debit instead of credit for these, we correct it.
+_INCOMING_PATTERNS = (
+    "fast transfer from", "transfer from", "payment from",
+    "credit to account", "salary credit", "refund from",
+    "return ", "cashback",
+)
+
+
+def _fix_credit_debit(tx: dict) -> dict:
+    """If description signals an incoming credit but LLM set debit instead, swap them."""
+    desc = (tx.get("description") or "").lower()
+    if not any(p in desc for p in _INCOMING_PATTERNS):
+        return tx
+    debit = tx.get("debit")
+    credit = tx.get("credit")
+    # Only fix if debit is set and credit is absent — classic LLM mix-up
+    if debit and not credit:
+        log.debug("credit_debit_swapped", description=tx.get("description"), amount=debit)
+        return {**tx, "debit": None, "credit": debit}
+    return tx
+
+
 def _is_balance_row(tx: dict) -> bool:
     desc = (tx.get("description") or "").strip().lower()
     return any(kw in desc for kw in _BALANCE_KEYWORDS)
@@ -94,5 +117,7 @@ def extract_transactions(raw_text: str, provider: Provider = DEFAULT_PROVIDER) -
     transactions = [_fix_date(tx) for tx in transactions]
     # Coerce all numeric fields to float — LLMs sometimes return amounts as strings
     transactions = [_coerce_amounts(tx) for tx in transactions]
+    # Swap debit↔credit for incoming transfers that the LLM misclassified
+    transactions = [_fix_credit_debit(tx) for tx in transactions]
     log.info("transactions_extracted", count=len(transactions), provider=provider)
     return transactions
