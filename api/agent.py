@@ -22,6 +22,7 @@ from api.llm import complete, complete_json, Provider, DEFAULT_PROVIDER
 from api.tools import (
     ALL_TOOL_SCHEMAS, TOOL_HANDLERS,
     extract_transactions, categorise_transactions, detect_anomalies, generate_summary,
+    validate_extraction,
 )
 
 log = structlog.get_logger()
@@ -45,24 +46,33 @@ def _event(type_: str, **payload) -> dict:
 
 _REACT_SYSTEM = """You are a bank statement analysis agent.
 
-Your job: process a PDF bank statement and produce a complete analysis using tools.
+Your goal: produce a complete analysis (transactions, categories, anomalies, summary)
+OR explain clearly why you cannot.
 
-Available tools (call each exactly once, in order):
-  1. extract_transactions      — parses the raw PDF text into structured rows
-  2. categorise_transactions   — assigns a spending category to each transaction
-  3. detect_anomalies          — flags unusual transactions
-  4. generate_summary          — produces the final monthly summary
+Available tools:
+  - extract_transactions     — parse PDF text into structured rows
+  - validate_extraction      — inspect quality of extracted transactions (cheap, no LLM)
+  - categorise_transactions  — assign spending category to each transaction
+  - detect_anomalies         — flag unusual transactions (rule-based)
+  - generate_summary         — write final monthly summary
 
-On each turn, respond with EXACTLY ONE JSON object on a single line:
-  - To call a tool:  {"action": "call_tool", "tool": "<tool_name>", "thought": "<one sentence>"}
-  - To finish:       {"action": "finish", "thought": "<one sentence>"}
+The system maintains state — you don't pass data between tools, just call them.
 
-Rules:
-- Call tools in the prescribed order.
-- The system maintains state — you don't need to pass transactions between tools.
-- If a tool returns an ERROR observation, retry the same tool once. If it errors twice, move on.
-- After generate_summary returns, your next action MUST be {"action": "finish", ...}.
-- Output ONLY the JSON object. No prose, no markdown fences, no additional text.
+Reasoning guidance:
+- After extract_transactions, you SHOULD call validate_extraction to assess quality.
+- If validate reports status="empty", do NOT continue — call finish with a clear
+  error_message ("The PDF appears to be a scanned image or has no readable text").
+- If status="sparse" (< 3 transactions), you MAY skip detect_anomalies — it
+  needs more data to be meaningful.
+- If status="poor_quality", you MAY retry extract_transactions once.
+- If a tool returns an ERROR observation, reason about whether to retry,
+  skip, or abort. Don't retry blindly.
+- generate_summary should be your last tool before finish.
+
+Response format — EXACTLY ONE JSON object per turn, no prose, no markdown fences:
+  Tool call:  {"action": "call_tool", "tool": "<name>", "thought": "<one sentence reasoning>"}
+  Finish OK:  {"action": "finish", "thought": "<one sentence>"}
+  Finish err: {"action": "finish", "thought": "<one sentence>", "error_message": "<user-facing explanation>"}
 """
 
 
@@ -71,6 +81,9 @@ def _execute_tool(tool_name: str, state: dict, provider: Provider) -> str:
     if tool_name == "extract_transactions":
         state["transactions"] = extract_transactions(state["raw_text"], provider=provider)
         return f"OK. Extracted {len(state['transactions'])} transactions."
+    if tool_name == "validate_extraction":
+        result = validate_extraction(state["transactions"])
+        return f"OK. {json.dumps(result)}"
     if tool_name == "categorise_transactions":
         if not state["transactions"]:
             return "ERROR: no transactions in state. Call extract_transactions first."
@@ -179,6 +192,10 @@ def _run_react_events(raw_text: str, provider: Provider) -> Iterator[dict]:
         if action.get("action") == "finish":
             if thought:
                 yield _event("thought", iteration=iteration + 1, text=thought)
+            err_msg = action.get("error_message")
+            if err_msg:
+                warnings.append(f"agent_aborted: {err_msg}")
+                yield _event("error", scope="agent_decision", error=err_msg)
             finished_cleanly = True
             break
 

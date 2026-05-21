@@ -90,5 +90,16 @@
   {"merchant": "MASTERCLASS", "category": "Education"},
   {"merchant": "LINKEDIN LEARNING", "category": "Education"},
   {"merchant": "TUITION CENTRE", "category": "Education"},
-  {"merchant": "GOOGLE PLAY EDUCATION", "category": "Education"}
+  {"merchant": "GOOGLE PLAY EDUCATION", "category": "Education"},
+  {"merchant": "DEFT REAL ESTATE", "category": "Bills"},
+  {"merchant": "DEFT PAYMENT", "category": "Bills"},
+  {"merchant": "NETBANK BPAY", "category": "Bills"},
+  {"merchant": "BPAY RENT", "category": "Bills"},
+  {"merchant": "BPAY PAYMENT", "category": "Bills"},
+  {"merchant": "RENT PAYMENT", "category": "Bills"},
+  {"merchant": "SERVICE NSW", "category": "Bills"},
+  {"merchant": "ROADS AND MARITIME", "category": "Bills"},
+  {"merchant": "TOLL PAYMENT", "category": "Bills"},
+  {"merchant": "COUNCIL RATES", "category": "Bills"},
+  {"merchant": "WATER RATES", "category": "Bills"}
 ]

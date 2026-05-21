@@ -51,14 +51,18 @@ def generate_summary(
 ) -> dict:
     agg = _aggregate(transactions)
     prompt = (
-        "Write a concise plain-English monthly summary (3-5 sentences) for the user based on this data. "
-        "Mention net cashflow, top 2 spend categories, and any anomalies worth attention. "
-        "Friendly but professional tone. No markdown.\n\n"
+        "Write a plain-English monthly summary for the user in exactly 3 short paragraphs "
+        "separated by a blank line (\\n\\n). No markdown, no bullet points, no headers.\n\n"
+        "Paragraph 1 — Cash flow: mention net cashflow amount and whether it is a surplus or deficit, "
+        "and the top 2 spending categories with their percentages.\n"
+        "Paragraph 2 — Anomalies: summarise the anomaly count and what types were flagged "
+        "(e.g. large debits, duplicates). If zero anomalies, say so briefly.\n"
+        "Paragraph 3 — Advice: one or two sentences of practical, friendly advice based on the data.\n\n"
         f"Aggregates: {json.dumps(agg, default=str)}\n"
         f"Anomaly count: {len(anomalies)}\n"
         f"Anomaly types: {[a.get('type') for a in anomalies]}"
     )
-    narrative = complete(prompt=prompt, max_tokens=400, provider=provider).strip()
+    narrative = complete(prompt=prompt, max_tokens=500, provider=provider).strip()
     result = {**agg, "anomaly_count": len(anomalies), "narrative": narrative}
     log.info("summary_generated", net=agg["net_cashflow"], provider=provider)
     return result

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Check, X, Loader2, FileText, ArrowRight, Flag } from "lucide-react";
+import { Check, X, Loader2, FileText, ArrowRight, Flag, ChevronDown, ChevronUp } from "lucide-react";
 
 export type AgentEvent = {
   type: string;
@@ -59,11 +59,11 @@ function Icon({ type, resolved }: { type: string; resolved?: boolean }) {
 function renderLine(ev: AgentEvent): string {
   switch (ev.type) {
     case "pdf_parsed":
-      return `Parsed PDF (${ev.chars} chars)`;
+      return `Parsed PDF${ev.filename ? ` · ${ev.filename}` : ""} (${ev.chars} chars)`;
     case "agent_start":
       return `Agent started · ${ev.provider} · ${ev.mode}`;
     case "iteration_start":
-      return `Iteration ${ev.iteration}`;
+      return `ReAct loop - Iteration ${ev.iteration}`;
     case "thought":
       return `think: "${ev.text}"`;
     case "tool_call":
@@ -98,9 +98,12 @@ function activeProvider(events: AgentEvent[]): string | null {
   const ev = events.find((e) => e.type === "agent_start");
   if (!ev) return null;
   const labels: Record<string, string> = {
-    gemini: "Gemini 2.0 Flash",
-    claude: "Claude Sonnet",
-    groq: "Groq Llama 3.3",
+    gemini:   "Gemma 4 26B",
+    gemini2:  "Gemma 4 31B",
+    groq:     "Llama 3.3 70B",
+    groq2:    "Llama 3.1 8B",
+    cerebras: "Cerebras Qwen 3 235B",
+    claude:   "Claude Sonnet",
   };
   return ev.provider ? (labels[ev.provider] ?? ev.provider) : null;
 }
@@ -129,16 +132,27 @@ function ElapsedTimer({ startTs }: { startTs: number }) {
 
 const DONE_TYPES = new Set(["finish", "done", "error"]);
 
-export default function AgentProgress({ events, startTs }: { events: AgentEvent[]; startTs: number }) {
+export default function AgentProgress({
+  events,
+  startTs,
+  collapsible = false,
+}: {
+  events: AgentEvent[];
+  startTs: number;
+  collapsible?: boolean;
+}) {
   const provider = activeProvider(events);
   const lastEvent = events[events.length - 1];
   const isDone = lastEvent ? DONE_TYPES.has(lastEvent.type) : false;
 
+  const [collapsed, setCollapsed] = useState(collapsible);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (collapsed) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [events]);
+  }, [events, collapsed]);
 
   // Set of `${iteration}-${tool}` keys that have a matching tool_done or tool_error
   const resolvedTools = new Set(
@@ -147,20 +161,45 @@ export default function AgentProgress({ events, startTs }: { events: AgentEvent[
       .map((e) => `${e.iteration}-${e.tool}`)
   );
 
+  const headerRow = (
+    <div className="font-mono text-xxs text-slate uppercase tracking-wider flex items-center gap-3">
+      <span>agent execution log</span>
+      {provider && (
+        <span className="text-accent border border-accent/30 px-1.5 py-0.5 rounded text-xxs normal-case tracking-normal">
+          {provider}
+        </span>
+      )}
+      {!isDone && <ElapsedTimer startTs={startTs} />}
+      {collapsible && (
+        <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal text-slate">
+          {collapsed && <span>{events.length} steps</span>}
+          {collapsed
+            ? <ChevronDown size={12} />
+            : <ChevronUp size={12} />}
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <div className="border border-dashed border-navy-lighter rounded-[10px] p-5 bg-navy-light/30">
-      <div className="font-mono text-xxs text-slate uppercase tracking-wider mb-2 flex items-center gap-3">
-        <span>agent execution log</span>
-        {provider && (
-          <span className="text-accent border border-accent/30 px-1.5 py-0.5 rounded text-xxs normal-case tracking-normal">
-            {provider}
-          </span>
-        )}
-        {/* Live timer — hidden once done */}
-        {!isDone && <ElapsedTimer startTs={startTs} />}
-      </div>
+      {collapsible ? (
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="w-full text-left mb-2 hover:opacity-80 transition-opacity"
+        >
+          {headerRow}
+        </button>
+      ) : (
+        <div className="mb-2">{headerRow}</div>
+      )}
 
-      <div ref={scrollRef} className="space-y-0.5 font-mono text-xs max-h-[220px] overflow-y-auto">
+      {!collapsed && (
+      <div
+        ref={scrollRef}
+        className="space-y-0.5 font-mono text-xs overflow-y-auto resize-y"
+        style={{ minHeight: "220px", height: "220px", maxHeight: "none" }}
+      >
         {events.length === 0 && (
           <div className="text-slate flex items-center gap-2">
             <Loader2 size={13} className="animate-spin text-accent" />
@@ -173,32 +212,59 @@ export default function AgentProgress({ events, startTs }: { events: AgentEvent[
             ev.type === "tool_call"
               ? resolvedTools.has(`${ev.iteration}-${ev.tool}`)
               : undefined;
+
+          const fmtLocal = (ts: number) =>
+            new Date(ts).toLocaleString(undefined, {
+              day: "2-digit", month: "short", year: "numeric",
+              hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+            });
+
+          const summaryRow = ev.type === "finish" && ev.ts && startTs ? (() => {
+            const elapsedS = Math.round((ev.ts - startTs) / 1000);
+            const m = Math.floor(elapsedS / 60);
+            const s = elapsedS % 60;
+            return (
+              <div key={`summary-${i}`} className="flex items-start gap-2.5 leading-relaxed mt-1 mb-0.5 border-t border-navy-lighter/40 pt-1">
+                <span className="min-w-[36px]" />
+                <span className="min-w-[14px]" />
+                <span className="text-slate/60 text-xxs font-mono space-y-0.5">
+                  <div>started&nbsp;&nbsp; {fmtLocal(startTs)}</div>
+                  <div>finished {fmtLocal(ev.ts)}</div>
+                  <div>elapsed&nbsp;&nbsp; {m > 0 ? `${m}m ` : ""}{s}s</div>
+                </span>
+              </div>
+            );
+          })() : null;
+
           return (
-          <div key={i} className="flex items-start gap-2.5 leading-relaxed">
-            <span className="text-slate min-w-[36px] text-xxs">{fmtTime(ev.ts, startTs)}</span>
-            <span className="mt-0.5 min-w-[14px] flex items-center justify-center">
-              <Icon type={ev.type} resolved={resolved} />
-            </span>
-            <span
-              className={
-                ev.type === "thought"
-                  ? "text-slate-light italic"
-                  : ev.type === "tool_done"
-                  ? "text-slate-lightest"
-                  : ev.type === "tool_error" || ev.type === "error"
-                  ? "text-red-300"
-                  : ev.type === "warning"
-                  ? "text-yellow-300"
-                  : ev.type === "finish" || ev.type === "done"
-                  ? "text-accent"
-                  : ev.type === "stats"
-                  ? "text-slate/60 italic"
-                  : "text-slate"
-              }
-            >
-              {renderLine(ev)}
-            </span>
-          </div>
+          <>
+            {summaryRow}
+            <div key={i} className="flex items-start gap-2.5 leading-relaxed">
+              <span className="text-slate min-w-[36px] text-xxs">{fmtTime(ev.ts, startTs)}</span>
+              <span className="mt-0.5 min-w-[14px] flex items-center justify-center">
+                <Icon type={ev.type} resolved={resolved} />
+              </span>
+              <span
+                className={
+                  ev.type === "thought"
+                    ? "text-slate-light italic"
+                    : ev.type === "tool_done"
+                    ? "text-slate-lightest"
+                    : ev.type === "tool_error" || ev.type === "error"
+                    ? "text-red-300"
+                    : ev.type === "warning"
+                    ? "text-yellow-300"
+                    : ev.type === "finish" || ev.type === "done"
+                    ? "text-accent"
+                    : ev.type === "stats"
+                    ? "text-slate/60 italic"
+                    : "text-slate"
+                }
+              >
+                {renderLine(ev)}
+              </span>
+            </div>
+          </>
           );
         })}
 
@@ -213,6 +279,7 @@ export default function AgentProgress({ events, startTs }: { events: AgentEvent[
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

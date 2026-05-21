@@ -30,9 +30,27 @@ export default function SummaryCard({ summary }: { summary: any }) {
         </div>
       </div>
 
-      <p className="text-sm text-slate leading-relaxed border-t border-navy-lighter pt-4">
-        {summary.narrative}
-      </p>
+      {(() => {
+        const LABELS = ["Cash flow", "Anomalies", "Advice"];
+        const paragraphs = (summary.narrative || "")
+          .split(/\n\n+/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        return (
+          <div className="border-t border-navy-lighter pt-4 space-y-4">
+            {paragraphs.map((para: string, i: number) => (
+              <div key={i}>
+                {LABELS[i] && (
+                  <p className="font-mono text-xxs text-accent uppercase tracking-wider mb-1">
+                    {LABELS[i]}
+                  </p>
+                )}
+                <p className="text-sm text-slate leading-relaxed">{para}</p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }

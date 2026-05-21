@@ -6,7 +6,6 @@ import TransactionTable from "@/components/TransactionTable";
 import SpendChart from "@/components/SpendChart";
 import SummaryCard from "@/components/SummaryCard";
 import ProviderSelect, { Provider } from "@/components/ProviderSelect";
-import ModeSelect, { Mode } from "@/components/ModeSelect";
 import AgentProgress, { AgentEvent } from "@/components/AgentProgress";
 import SectionHeader from "@/components/SectionHeader";
 import TopCategories from "@/components/TopCategories";
@@ -24,14 +23,8 @@ export default function Home() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<Provider>("groq");
-  const [mode, setMode] = useState<Mode>("react");
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [startTs, setStartTs] = useState<number>(0);
-
-  function handleProviderChange(p: Provider) {
-    setProvider(p);
-    if (p !== "claude" && mode === "native") setMode("react");
-  }
 
   async function handleUpload(file: File) {
     const t0 = Date.now();
@@ -44,7 +37,7 @@ export default function Home() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("provider", provider);
-    fd.append("mode", mode);
+    fd.append("mode", "react");
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/analyze/stream`, {
@@ -120,8 +113,8 @@ export default function Home() {
           Drop a PDF statement. A{" "}
           <span className="text-accent font-mono text-xs">ReAct</span>{" "}
           agent extracts transactions, categorises spending, flags anomalies,
-          and writes a plain-English summary. Pick your model below — Gemini,
-          Claude, or Groq.
+          and writes a plain-English summary. Pick your model below — Groq,
+          Gemini, Claude, OpenAI, or Cerebras.
         </p>
       </header>
 
@@ -131,12 +124,32 @@ export default function Home() {
           <SectionHeader icon={FileScan} label="Try it" title="Upload a statement." />
 
           <div className="flex flex-wrap gap-4 mb-5">
-            <ProviderSelect value={provider} onChange={handleProviderChange} disabled={loading} />
-            <ModeSelect value={mode} onChange={setMode} provider={provider} disabled={loading} />
+            <ProviderSelect value={provider} onChange={setProvider} disabled={loading} />
           </div>
 
           {!loading && events.length === 0 && (
-            <UploadDropzone onFile={handleUpload} loading={false} />
+            <>
+              <UploadDropzone onFile={handleUpload} loading={false} />
+              <div className="mt-3">
+                <p className="text-xxs font-mono text-slate mb-2 uppercase tracking-wider">sample statements for testing</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "CommBank", file: "Comm-bank-statement-sample.pdf" },
+                    { label: "ANZ",      file: "ANZ-bank-statement-sample.pdf" },
+                    { label: "NAB",      file: "NAB-bank-statement-sample.pdf" },
+                  ].map(({ label, file }) => (
+                    <a
+                      key={file}
+                      href={`/samples/${file}`}
+                      download={file}
+                      className="text-xxs font-mono text-accent border border-accent/30 px-2 py-1 rounded hover:bg-accent/10 transition-colors"
+                    >
+                      ↓ {label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
 
           {(loading || events.length > 0) && (
@@ -201,7 +214,13 @@ export default function Home() {
             </div>
           )}
 
-          <div className="mt-6">
+          {events.length > 0 && (
+            <div className="mt-4">
+              <AgentProgress events={events} startTs={startTs} collapsible />
+            </div>
+          )}
+
+          <div className="mt-4">
             <button
               onClick={() => { setResult(null); setEvents([]); setError(null); }}
               className="btn-solid"
